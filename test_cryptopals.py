@@ -62,8 +62,15 @@ assert equals(
 
 # Problem 1.7
 assert equals(
-	cryptopals.decrypt_aes_128_in_ecb_mode("testfiles/7.txt", "YELLOW SUBMARINE"),
+	cryptopals.aes_128_in_ecb_mode("testfiles/7.txt", "YELLOW SUBMARINE", "decrypt"),
 	solutions.soln_7
+)
+
+#crypted = cryptopals.encrypt_cbc_mode(solutions.snake_wounded, "YELLOW SUBMARINE", b'\x00', from_string=True, is_b64=False)
+crypted = cryptopals.aes_128_in_ecb_mode(solutions.snake_wounded, "YELLOW SUBMARINE", "encrypt", from_string=True, from_b64=False)
+assert equals(
+	cryptopals.aes_128_in_ecb_mode(crypted, "YELLOW SUBMARINE", "decrypt", from_string=True, from_b64=False),
+	solutions.snake_wounded
 )
 
 # Problem 1.8
@@ -79,11 +86,17 @@ assert equals(
 )
 
 # Problem 2.2 (10)
-print(cryptopals.encrypt_cbc_mode("testfiles/operationsnakeeater.txt", "YELLOW SUBMARINE", b'\x00', from_string=True))
-print(cryptopals.decrypt_cbc_mode())
+print(
+	cryptopals.cbc_mode(
+		solutions.snake_wounded,
+		"YELLOW SUBMARINE",
+		"encrypt",
+		b'\x00',
+		from_string=True,
+		is_b64=False
+	)
+)
 
-print(cryptopals.decrypt_cbc_mode("testfiles/10.txt", "YELLOW SUBMARINE", b'\x00'))
+#print(cryptopals.decrypt_cbc_mode())
 
-# PRoblem 2.3 (11)
-
-# Problem 2.4 (12)
+#print(cryptopals.decrypt_cbc_mode("testfiles/10.txt", "YELLOW SUBMARINE", b'\x00'))
