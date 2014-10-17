@@ -94,7 +94,7 @@ cbc_snake = (
         b'\x00',
         "encrypt",
         from_string=True,
-        is_b64=False
+        from_b64=False
     )
 )
 
@@ -105,7 +105,7 @@ decoded_cbc_snake = (
         b'\x00',
         "decrypt",
         from_string=True,
-        is_b64=False
+        from_b64=False
     )
 )
 
@@ -119,6 +119,10 @@ assert equals(
 )
 
 # TODO: Problem 2.3 (11): An ECB/CBC detection oracle
+for i in range(0, 10):
+    input = solutions.soln_10
+    encrypted, mode = cryptopals.encryption_oracle(input)
+    assert equals(cryptopals.detect_ecb_or_cbc(encrypted) == mode)
 
 # TODO: Problem 2.4 (12): Byte-at-a-time ECB decryption (Simple)
 

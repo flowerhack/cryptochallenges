@@ -5,6 +5,7 @@ from collections import defaultdict
 import sys
 from Crypto.Cipher import AES
 import codecs
+from random import randint
 
 decode_hex = codecs.getdecoder("hex_codec")
 encode_hex = codecs.getencoder("hex_codec")
@@ -214,6 +215,15 @@ def aes_128_in_ecb_mode(infile, key, action, from_string=False, from_b64=True):
         return
 
 
+def detect_ecb(cyphertext):
+    sets = []
+    for group in grouper(cyphertext, 16):
+        sets.append(group)
+    if len(set(sets)) < len(sets):
+        return True
+    return False
+
+
 def detect_aes_128_in_ecb_mode(infile):
     """
     Detects which line in `infile` has been encrypted with AES-128 in ECB mode
@@ -226,29 +236,28 @@ def detect_aes_128_in_ecb_mode(infile):
         for i, line in enumerate(f):
             cyphertext = decode_hex(line.strip())[0]
             # Problem hinted at doing 16 bytes at a time, so let's try that
-            sets = []
-            for group in grouper(cyphertext, 16):
-                sets.append(group)
-            if len(set(sets)) < len(sets):
+            if detect_ecb(cyphertext):
                 return ("Line " + str(i) + ": " + str(line.strip()))
 
 
-def pkcs7_padding(utf8_string, target_length):
+def pkcs7_padding(utf8_string, target_blocksize, padding_amount=False):
     bytetext = bytearray(bytes(utf8_string, "utf-8"))
-    for i in range(len(bytetext), target_length):
+    if not padding_amount:
+        padding_amount = target_blocksize - (len(bytetext) % target_blocksize)
+    for i in range(0, padding_amount):
         bytetext.extend(b'\x04')
-    assert(len(bytetext) == target_length)
+    #assert((len(bytetext) % target_blocksize) == 0)
     return bytetext.decode('utf-8')
 
 
 # I found the diagram on the CBC wikipedia article very helpful for this!
 # https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher-block_chaining_.28CBC.29
 # TODO clean this up wow it's super ugly and I bet we're using it again too
-def cbc_mode(infile, key, iv, action, from_string=False, is_b64=True):
+def cbc_mode(infile, key, iv, action, from_string=False, from_b64=True):
     text = infile if from_string else _string_from_file(infile)
     keysize = len(key)
     iv = iv * keysize  # TODO mod iv
-    text = base64.b64decode(text) if is_b64 else text
+    text = base64.b64decode(text) if from_b64 else text
     prev_block = None
     modtext = b''
 
@@ -283,3 +292,37 @@ def cbc_mode(infile, key, iv, action, from_string=False, is_b64=True):
 
     else:
         return
+
+def random_aes_key():
+    """ Generates a random AES key (16 bytes in length) """
+    return bytes([randint(0,255) for i in range(0, 16)])
+
+def encryption_oracle(input):
+    """
+    Encrypts `input` using either ECB or CBC (choosing between the two at random).
+    """
+    encrypted = ""
+    blocksize = 16
+    key = random_aes_key()
+    # Converts input to bytes, prepends 5-10 random bytes, and appends 5-10 random bytes
+    to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
+    to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
+    #import pdb; pdb.set_trace()
+    temp = to_prepend + bytes(input, "utf-8") + to_append
+    padding_amount = (blocksize - len(temp) % 16)
+    input = pkcs7_padding(input, blocksize, padding_amount)
+    input = to_prepend + bytes(input, "utf-8") + to_append
+    input = bytes(input)
+    if randint(0, 1) == 0:
+        encrypted = (aes_128_in_ecb_mode(input, key, "encrypt", from_string=True, from_b64=False), "ECB")
+    else:
+        iv = "foo"
+        encrypted = (cbc_mode(input, key, iv, "encrypt", from_string=True, from_b64=False), "CBC")
+    return encrypted
+
+def detect_ecb_or_cbc(input):
+    # return "ECB" if detect_ecb(input) else return "CBC" --> why doesn't this work
+    if detect_ecb(input):
+        return "ECB"
+    else:
+        return "CBC"
