@@ -247,25 +247,43 @@ def pkcs7_padding(utf8_string, target_length):
 # each ciphertext block is *added* to the next plaintext block before the next call to the cipher core
 # first plaintext block: has no previous ciphertext block. it's added to the IV
 # each plaintext block is XORed with the previous ciphertext block before being encrypted
-def encrypt_cbc_mode(infile, key, iv, action, from_string=False, is_b64=True):
+def cbc_mode(infile, key, iv, action, from_string=False, is_b64=True):
 	# call ecb: make it encrypt instead of decrypt
 	# use XOR function to combine them
 	# ...????
 	# First block: plaintext & XOR against IV THEN encrypt that
 	#import pdb; pdb.set_trace()
-	plaintext = infile if from_string else _string_from_file(infile)
-	# todo mod iv
+	text = infile if from_string else _string_from_file(infile)
 	keysize = len(key)
-	iv = iv * keysize
-	plaintext = base64.b64decode(plaintext) if is_b64 else plaintext
+	iv = iv * keysize  # TODO mod iv
+	text = base64.b64decode(text) if is_b64 else text
 	prev_block = None
-	ciphertext = b''
-	for group in grouper(plaintext, keysize):
-		if not prev_block:
-			prev_block = xor_two_buffers_mod(group, iv)
-			ciphertext = ciphertext + aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
-		else:
-			filtered_group = [0 if i is None else i for i in group]
-			prev_block = xor_two_buffers_mod(prev_block, filtered_group)
-			ciphertext = ciphertext + aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
-	return ciphertext
+	modtext = b''
+
+	if action == "encrypt":
+		for group in grouper(text, keysize):
+			if not prev_block:
+				prev_block = xor_two_buffers_mod(group, iv)
+				modtext = modtext + aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
+			else:
+				filtered_group = [0 if i is None else i for i in group]
+				prev_block = xor_two_buffers_mod(prev_block, filtered_group)
+				modtext = modtext + aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
+		return modtext
+
+	elif action == "decrypt":
+		for group in grouper(text, keysize):
+			if not prev_block:
+				prev_block = bytes(group)
+				temp_block = aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
+				plain_block = xor_two_buffers_mod(temp_block, iv)
+				modtext = modtext + plain_block
+			else:
+				filtered_group = bytes([0 if i is None else i for i in group])
+				temp_block = aes_128_in_ecb_mode(filtered_group, key, "encrypt", from_string=True, from_b64=False)
+				plain_block = xor_two_buffers_mod(temp_block, prev_block)
+				modtext = modtext + plain_block
+		return modtext
+
+	else:
+		return

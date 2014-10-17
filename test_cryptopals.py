@@ -85,17 +85,36 @@ assert equals(
 	"YELLOW SUBMARINE\x04\x04\x04\x04"
 )
 
+print(solutions.snake_wounded)
+
 # Problem 2.2 (10)
-print(
+cbc_snake = (
 	cryptopals.cbc_mode(
 		solutions.snake_wounded,
 		"YELLOW SUBMARINE",
-		"encrypt",
 		b'\x00',
+		"encrypt",
 		from_string=True,
 		is_b64=False
 	)
 )
+
+print(cbc_snake)
+
+decoded_cbc_snake = (
+	cryptopals.cbc_mode(
+		cbc_snake,
+		"YELLOW SUBMARINE",
+		b'\x00',
+		"decrypt",
+		from_string=True,
+		is_b64=False
+	)
+)
+
+print(decoded_cbc_snake)
+
+print(decoded_cbc_snake.encode("utf-8"))
 
 #print(cryptopals.decrypt_cbc_mode())
 
