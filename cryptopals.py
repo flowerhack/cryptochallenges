@@ -1,4 +1,3 @@
-#import bitarray
 import base64
 import re
 from itertools import cycle, zip_longest
@@ -29,7 +28,7 @@ def display_hex(raw_hex_str):
 
 def hex_to_b64(hex_str):
 	""" Converts a hex-formatted string into b64 bytes """
-	return base64.b64encode(decode_hex(hex_str)[0]).decode("utf-8")
+	return base64.b64encode(decode_hex(hex_str)[0])
 
 def xor_two_buffers(buffer1, buffer2):
 	""" Takes two hex-formatted strings and returns a hex-formatted string """
@@ -50,13 +49,11 @@ def score_chars(word):
 	return score
 
 def decode_single_byte_xor_cypher(hex_str, retkey=False):
+	#import pdb; pdb.set_trace()
 	max_score = 0
 	best_match = ""
 	for key in range(255):
-		# byte is a hex string. We convert the hex string to its unicode representation.
-		# We get the ascii value of that representation, then XOR it against the key.
-		# Then w find out what the resulting character of that XOR is.
-		xor_result = [chr(ord(byte) ^ key) for byte in hex_str.decode("hex")]
+		xor_result = [chr(byte ^ key) for byte in list(decode_hex(hex_str)[0])]
 		xor_result = ''.join(xor_result)
 		score = score_chars(xor_result)
 		if score > max_score:
