@@ -114,8 +114,6 @@ decoded_cbc_snake = (
 
 print(decoded_cbc_snake)
 
-print(decoded_cbc_snake.encode("utf-8"))
-
 #print(cryptopals.decrypt_cbc_mode())
 
 #print(cryptopals.decrypt_cbc_mode("testfiles/10.txt", "YELLOW SUBMARINE", b'\x00'))

@@ -263,8 +263,9 @@ def cbc_mode(infile, key, iv, action, from_string=False, is_b64=True):
 	if action == "encrypt":
 		for group in grouper(text, keysize):
 			if not prev_block:
-				prev_block = xor_two_buffers_mod(group, iv)
-				modtext = modtext + aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
+				temp_block = xor_two_buffers_mod(group, iv)
+				prev_block = aes_128_in_ecb_mode(temp_block, key, "encrypt", from_string=True, from_b64=False)
+				modtext = modtext + prev_block
 			else:
 				filtered_group = [0 if i is None else i for i in group]
 				prev_block = xor_two_buffers_mod(prev_block, filtered_group)
@@ -275,12 +276,12 @@ def cbc_mode(infile, key, iv, action, from_string=False, is_b64=True):
 		for group in grouper(text, keysize):
 			if not prev_block:
 				prev_block = bytes(group)
-				temp_block = aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
+				temp_block = aes_128_in_ecb_mode(prev_block, key, "decrypt", from_string=True, from_b64=False)
 				plain_block = xor_two_buffers_mod(temp_block, iv)
 				modtext = modtext + plain_block
 			else:
 				filtered_group = bytes([0 if i is None else i for i in group])
-				temp_block = aes_128_in_ecb_mode(filtered_group, key, "encrypt", from_string=True, from_b64=False)
+				temp_block = aes_128_in_ecb_mode(filtered_group, key, "decrypt", from_string=True, from_b64=False)
 				plain_block = xor_two_buffers_mod(temp_block, prev_block)
 				modtext = modtext + plain_block
 		return modtext
