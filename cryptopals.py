@@ -303,11 +303,11 @@ def encryption_oracle(input):
     """
     encrypted = ""
     blocksize = 16
+    iv = blocksize * b'\x00'
     key = random_aes_key()
     # Converts input to bytes, prepends 5-10 random bytes, and appends 5-10 random bytes
     to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
     to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
-    #import pdb; pdb.set_trace()
     temp = to_prepend + bytes(input, "utf-8") + to_append
     padding_amount = (blocksize - len(temp) % 16)
     input = pkcs7_padding(input, blocksize, padding_amount)
@@ -316,7 +316,6 @@ def encryption_oracle(input):
     if randint(0, 1) == 0:
         encrypted = (aes_128_in_ecb_mode(input, key, "encrypt", from_string=True, from_b64=False), "ECB")
     else:
-        iv = "foo"
         encrypted = (cbc_mode(input, key, iv, "encrypt", from_string=True, from_b64=False), "CBC")
     return encrypted
 
