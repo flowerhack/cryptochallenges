@@ -82,8 +82,8 @@ assert equals(
 
 # Problem 2.1 (9): Implement PKCS#7 padding
 assert equals(
-    cryptopals.pkcs7_padding("YELLOW SUBMARINE", 20),
-    "YELLOW SUBMARINE\x04\x04\x04\x04"
+    cryptopals.pkcs7_padding('YELLOW SUBMARINE', 20),
+    'YELLOW SUBMARINE\x04\x04\x04\x04'
 )
 
 # Problem 2.2 (10): Implement CBC mode
@@ -125,5 +125,9 @@ for i in range(0, 10):
     assert equals(cryptopals.detect_ecb_or_cbc(encrypted), mode)
 
 # TODO: Problem 2.4 (12): Byte-at-a-time ECB decryption (Simple)
+#consistent_key = cryptopals.random_aes_key()
+#magic_text = solutions.problem_12
+#print(solutions.problem_12)
+#print(cryptopals.problem12(my_input, consistent_key, magic_text))
 
 # TODO: Problem 2.5 (13): ECB cut-and-paste

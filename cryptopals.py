@@ -216,6 +216,7 @@ def aes_128_in_ecb_mode(infile, key, action, from_string=False, from_b64=True):
 
 
 def detect_ecb(cyphertext):
+    """ Returns True if cyphertext appears to be ECB-encrypted; else False """
     sets = []
     for group in grouper(cyphertext, 16):
         sets.append(group)
@@ -241,12 +242,15 @@ def detect_aes_128_in_ecb_mode(infile):
 
 
 def pkcs7_padding(utf8_string, target_blocksize, padding_amount=False):
+    """
+    Takes a string and pads it to target_blocksize length.
+    If padding_amount is set, this will instead just add that amount to the end.
+    """
     bytetext = bytearray(bytes(utf8_string, "utf-8"))
     if not padding_amount:
         padding_amount = target_blocksize - (len(bytetext) % target_blocksize)
     for i in range(0, padding_amount):
         bytetext.extend(b'\x04')
-    #assert((len(bytetext) % target_blocksize) == 0)
     return bytetext.decode('utf-8')
 
 
@@ -254,40 +258,42 @@ def pkcs7_padding(utf8_string, target_blocksize, padding_amount=False):
 # https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher-block_chaining_.28CBC.29
 # TODO clean this up wow it's super ugly and I bet we're using it again too
 def cbc_mode(infile, key, iv, action, from_string=False, from_b64=True):
+    # Read in the string, if it's from a file
     text = infile if from_string else _string_from_file(infile)
-    keysize = len(key)
-    iv = iv * keysize  # TODO mod iv
+    # b64decode the string, if it's in b64 format
     text = base64.b64decode(text) if from_b64 else text
+    keysize = len(key)
+    iv = iv * keysize
+    # In CBC, we'll be XORing each block against the previous block, so:
     prev_block = None
+    # This will hold the result of either our decryption or encryption
     modtext = b''
 
     if action == "encrypt":
         for group in grouper(text, keysize):
+            filtered_group = bytes([0 if i is None else i for i in group])
+            # If we're on the first block, XOR against IV; else, XOR against prev_block
             if not prev_block:
-                temp_block = xor_two_buffers_mod(group, iv)
-                prev_block = aes_128_in_ecb_mode(temp_block, key, "encrypt", from_string=True, from_b64=False)
-                modtext = modtext + prev_block
+                temp_block = xor_two_buffers_mod(filtered_group, iv)
             else:
-                filtered_group = [0 if i is None else i for i in group]
-                prev_block = xor_two_buffers_mod(prev_block, filtered_group)
-                lol_block = aes_128_in_ecb_mode(prev_block, key, "encrypt", from_string=True, from_b64=False)
-                modtext = modtext + lol_block
-                prev_block = lol_block
+                temp_block = xor_two_buffers_mod(prev_block, filtered_group)
+            # then encrypt & append to modtext
+            prev_block = aes_128_in_ecb_mode(temp_block, key, "encrypt", from_string=True, from_b64=False)
+            modtext = modtext + prev_block
         return modtext
 
     elif action == "decrypt":
         for group in grouper(text, keysize):
+            filtered_group = bytes([0 if i is None else i for i in group])
+            # Decrypt the current block
+            temp_block = aes_128_in_ecb_mode(filtered_group, key, "decrypt", from_string=True, from_b64=False)
+            # If we're on the first block, XOR against IV; else, XOR against prev_block
             if not prev_block:
-                prev_block = bytes(group)
-                temp_block = aes_128_in_ecb_mode(prev_block, key, "decrypt", from_string=True, from_b64=False)
                 plain_block = xor_two_buffers_mod(temp_block, iv)
-                modtext = modtext + plain_block
             else:
-                filtered_group = bytes([0 if i is None else i for i in group])
-                temp_block = aes_128_in_ecb_mode(filtered_group, key, "decrypt", from_string=True, from_b64=False)
                 plain_block = xor_two_buffers_mod(temp_block, prev_block)
-                modtext = modtext + plain_block
-                prev_block = filtered_group
+            modtext = modtext + plain_block
+            prev_block = filtered_group
         return modtext
 
     else:
@@ -320,8 +326,33 @@ def encryption_oracle(input):
     return encrypted
 
 def detect_ecb_or_cbc(input):
-    # return "ECB" if detect_ecb(input) else return "CBC" --> why doesn't this work
+    """
+    This is super-lazy and just assumes, if it's not ECB, must be CBC! It works
+    for the purpose of the cryptochallenges (so far) but could be better :D;;;
+    """
     if detect_ecb(input):
         return "ECB"
     else:
         return "CBC"
+
+def problem12(input, key, magic_text):
+    aes_128_in_ecb_mode(input, key, "encrypt", from_string=True, from_b64=True)
+
+    """
+    Encrypts `input` using either ECB or CBC (choosing between the two at random).
+    """
+    encrypted = ""
+    blocksize = 16
+    iv = blocksize * b'\x00'
+    magic_text = base64.b64decode(magic_text)
+    input = magic_text + input
+    # Converts input to bytes, prepends 5-10 random bytes, and appends 5-10 random bytes
+    to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
+    to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
+    temp = to_prepend + bytes(input, "utf-8") + to_append
+    padding_amount = (blocksize - len(temp) % 16)
+    input = pkcs7_padding(input, blocksize, padding_amount)
+    input = to_prepend + bytes(input, "utf-8") + to_append
+    input = bytes(input)
+    encrypted = (aes_128_in_ecb_mode(input, key, "encrypt", from_string=True, from_b64=False), "ECB")
+    return encrypted
