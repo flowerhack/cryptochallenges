@@ -246,12 +246,12 @@ def pkcs7_padding(utf8_string, target_blocksize, padding_amount=False):
     Takes a string and pads it to target_blocksize length.
     If padding_amount is set, this will instead just add that amount to the end.
     """
-    bytetext = bytearray(bytes(utf8_string, "utf-8"))
+    bytetext = bytearray(utf8_string)
     if not padding_amount:
         padding_amount = target_blocksize - (len(bytetext) % target_blocksize)
     for i in range(0, padding_amount):
         bytetext.extend(b'\x04')
-    return bytetext.decode('utf-8')
+    return bytetext
 
 
 # I found the diagram on the CBC wikipedia article very helpful for this!
@@ -303,26 +303,29 @@ def random_aes_key():
     """ Generates a random AES key (16 bytes in length) """
     return bytes([randint(0,255) for i in range(0, 16)])
 
-def encryption_oracle(input):
+def encryption_oracle(instring):
     """
-    Encrypts `input` using either ECB or CBC (choosing between the two at random).
+    Encrypts `instring` using either ECB or CBC (choosing between the two at random).
     """
+    instring = bytes(instring, "utf-8")
     encrypted = ""
     blocksize = 16
     iv = blocksize * b'\x00'
     key = random_aes_key()
-    # Converts input to bytes, prepends 5-10 random bytes, and appends 5-10 random bytes
+
+    # We want to prepend 5-10 random bytes and appends 5-10 random bytes
     to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
     to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
-    temp = to_prepend + bytes(input, "utf-8") + to_append
-    padding_amount = (blocksize - len(temp) % 16)
-    input = pkcs7_padding(input, blocksize, padding_amount)
-    input = to_prepend + bytes(input, "utf-8") + to_append
-    input = bytes(input)
+
+    # We'll need to pad instring s.t. len(to_prepend + instring + padding + to_append) % 16 == 0
+    padding_amount = (blocksize - len(to_prepend + instring + to_append) % 16)
+    instring = to_prepend + pkcs7_padding(instring, blocksize, padding_amount) + to_append
+    instring = bytes(instring)
+
     if randint(0, 1) == 0:
-        encrypted = (aes_128_in_ecb_mode(input, key, "encrypt", from_string=True, from_b64=False), "ECB")
+        encrypted = (aes_128_in_ecb_mode(instring, key, "encrypt", from_string=True, from_b64=False), "ECB")
     else:
-        encrypted = (cbc_mode(input, key, iv, "encrypt", from_string=True, from_b64=False), "CBC")
+        encrypted = (cbc_mode(instring, key, iv, "encrypt", from_string=True, from_b64=False), "CBC")
     return encrypted
 
 def detect_ecb_or_cbc(input):
@@ -345,7 +348,7 @@ def problem12(input, key, magic_text):
     blocksize = 16
     iv = blocksize * b'\x00'
     magic_text = base64.b64decode(magic_text)
-    input = magic_text + input
+    input = magic_text + bytes(input)
     # Converts input to bytes, prepends 5-10 random bytes, and appends 5-10 random bytes
     to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
     to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])

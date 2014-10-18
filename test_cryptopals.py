@@ -82,8 +82,8 @@ assert equals(
 
 # Problem 2.1 (9): Implement PKCS#7 padding
 assert equals(
-    cryptopals.pkcs7_padding('YELLOW SUBMARINE', 20),
-    'YELLOW SUBMARINE\x04\x04\x04\x04'
+    cryptopals.pkcs7_padding(b'YELLOW SUBMARINE', 20),
+    b'YELLOW SUBMARINE\x04\x04\x04\x04'
 )
 
 # Problem 2.2 (10): Implement CBC mode
