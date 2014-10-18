@@ -338,24 +338,49 @@ def detect_ecb_or_cbc(input):
     else:
         return "CBC"
 
-def problem12(input, key, magic_text):
-    aes_128_in_ecb_mode(input, key, "encrypt", from_string=True, from_b64=True)
-
+def magic_text_oracle(instring, key, magic_text):
     """
-    Encrypts `input` using either ECB or CBC (choosing between the two at random).
+    Encrypts `instring` + `magic_text` using ECB mode and the given key.
     """
+    instring = instring + magic_text
     encrypted = ""
     blocksize = 16
     iv = blocksize * b'\x00'
-    magic_text = base64.b64decode(magic_text)
-    input = magic_text + bytes(input)
-    # Converts input to bytes, prepends 5-10 random bytes, and appends 5-10 random bytes
+
+    # We want to prepend 5-10 random bytes and appends 5-10 random bytes
     to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
     to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
-    temp = to_prepend + bytes(input, "utf-8") + to_append
-    padding_amount = (blocksize - len(temp) % 16)
-    input = pkcs7_padding(input, blocksize, padding_amount)
-    input = to_prepend + bytes(input, "utf-8") + to_append
-    input = bytes(input)
-    encrypted = (aes_128_in_ecb_mode(input, key, "encrypt", from_string=True, from_b64=False), "ECB")
-    return encrypted
+
+    # We'll need to pad instring s.t. len(to_prepend + instring + padding + to_append) % 16 == 0
+    padding_amount = (blocksize - len(to_prepend + instring + to_append) % 16)
+    instring = to_prepend + pkcs7_padding(instring, blocksize, padding_amount) + to_append
+    instring = bytes(instring)
+
+    return aes_128_in_ecb_mode(instring, key, "encrypt", from_string=True, from_b64=False)
+
+def detect_block_size():
+    pass
+
+def craft_input_block(target_size):
+    return b'A' * target_size
+
+def decrypt_magic_text(magic_text, key):
+    #block_size = detect_block_size()
+    magic_text = base64.b64decode(magic_text)
+    block_size = 16
+    input_block = craft_input_block(block_size-1)
+    inputs_dict = {}
+    result = b''
+    magic_size = len(magic_text)
+
+    for j in range(256):
+        new_input = input_block + bytes([j])
+        new_input_result = magic_text_oracle(new_input, key, magic_text)
+        inputs_dict[j] = new_input_result[0:block_size][block_size-1]
+
+    for i in range(magic_size):
+        this_magic = magic_text[i:magic_size]
+        byte_short_result = magic_text_oracle(input_block, key, magic_text)[block_size-1]
+        result = result + bytes([inputs_dict[byte_short_result]])
+
+    return result

@@ -125,9 +125,10 @@ for i in range(0, 10):
     assert equals(cryptopals.detect_ecb_or_cbc(encrypted), mode)
 
 # TODO: Problem 2.4 (12): Byte-at-a-time ECB decryption (Simple)
-#consistent_key = cryptopals.random_aes_key()
+consistent_key = cryptopals.random_aes_key()
 #magic_text = solutions.problem_12
 #print(solutions.problem_12)
 #print(cryptopals.problem12(my_input, consistent_key, magic_text))
+print(cryptopals.decrypt_magic_text(solutions.problem_12, consistent_key))
 
 # TODO: Problem 2.5 (13): ECB cut-and-paste
