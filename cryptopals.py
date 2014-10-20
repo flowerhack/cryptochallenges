@@ -338,7 +338,7 @@ def detect_ecb_or_cbc(input):
     else:
         return "CBC"
 
-def magic_text_oracle(instring, key, magic_text):
+def magic_text_oracle(instring, key, magic_text, add_rand_chars=True):
     """
     Encrypts `instring` + `magic_text` using ECB mode and the given key.
     """
@@ -347,9 +347,13 @@ def magic_text_oracle(instring, key, magic_text):
     blocksize = 16
     iv = blocksize * b'\x00'
 
-    # We want to prepend 5-10 random bytes and appends 5-10 random bytes
-    to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
-    to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
+    if add_rand_chars:
+        # We want to prepend 5-10 random bytes and appends 5-10 random bytes
+        to_prepend = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
+        to_append = bytes([randint(0, 255) for i in range(0, randint(5, 10))])
+    else:
+        to_prepend = b''
+        to_append = b''
 
     # We'll need to pad instring s.t. len(to_prepend + instring + padding + to_append) % 16 == 0
     padding_amount = (blocksize - len(to_prepend + instring + to_append) % 16)
@@ -358,29 +362,39 @@ def magic_text_oracle(instring, key, magic_text):
 
     return aes_128_in_ecb_mode(instring, key, "encrypt", from_string=True, from_b64=False)
 
-def detect_block_size():
-    pass
+def detect_block_size(key):
+    for potential_blocksize in range(4, 256):
+        test_str = bytes("".join([chr(i) for i in [randint(65,90) for j in range(0, potential_blocksize)]]), "utf-8")
+        crypted = magic_text_oracle(test_str*25, key, b'', add_rand_chars=False)
+        sets = []
+        for group in grouper(crypted, potential_blocksize):
+            sets.append(group)
+        if len(set(sets)) == 2:
+            return potential_blocksize
+    return None
 
 def craft_input_block(target_size):
     return b'A' * target_size
 
 def decrypt_magic_text(magic_text, key):
-    #block_size = detect_block_size()
     magic_text = base64.b64decode(magic_text)
-    block_size = 16
+    block_size = detect_block_size(key)  # is 16, but we compute anyway
     input_block = craft_input_block(block_size-1)
     inputs_dict = {}
     result = b''
     magic_size = len(magic_text)
 
+    testing = []
+
+# LOL gotta get the whole block wow i lose
     for j in range(256):
         new_input = input_block + bytes([j])
-        new_input_result = magic_text_oracle(new_input, key, magic_text)
-        inputs_dict[j] = new_input_result[0:block_size][block_size-1]
+        new_input_result = magic_text_oracle(new_input, key, magic_text, add_rand_chars=False)
+        inputs_dict[new_input_result[0:block_size]] = j
 
     for i in range(magic_size):
         this_magic = magic_text[i:magic_size]
-        byte_short_result = magic_text_oracle(input_block, key, magic_text)[block_size-1]
-        result = result + bytes([inputs_dict[byte_short_result]])
+        byte_short_result = magic_text_oracle(input_block, key, this_magic, add_rand_chars=False)[0:block_size]
+        result = result + bytes(chr(inputs_dict[byte_short_result]), "utf-8")
 
     return result
