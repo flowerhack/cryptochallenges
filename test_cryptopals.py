@@ -124,7 +124,7 @@ for i in range(0, 10):
     encrypted, mode = cryptopals.encryption_oracle(input)
     assert equals(cryptopals.detect_ecb_or_cbc(encrypted), mode)
 
-# TODO: Problem 2.4 (12): Byte-at-a-time ECB decryption (Simple)
+# Problem 2.4 (12): Byte-at-a-time ECB decryption (Simple)
 consistent_key = cryptopals.random_aes_key()
 assert equals(
     cryptopals.decrypt_magic_text(solutions.problem_12, consistent_key),
@@ -132,3 +132,10 @@ assert equals(
 )
 
 # TODO: Problem 2.5 (13): ECB cut-and-paste
+cryptopals.copypasta_attack()
+
+# TODO: Problem 2.6 (14): Byte-at-a-time ECB decryption (Harder)
+
+# TODO: Problem 2.7 (15): PKCS#7 padding validation
+
+# TODO: Problem 2.8 (16): CBC bitflipping attacks

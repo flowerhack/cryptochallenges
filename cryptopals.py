@@ -338,7 +338,7 @@ def detect_ecb_or_cbc(input):
     else:
         return "CBC"
 
-def magic_text_oracle(instring, key, magic_text, add_rand_chars=True):
+def magic_text_oracle(instring, key, magic_text, add_rand_chars=True, action="encrypt"):
     """
     Encrypts `instring` + `magic_text` using ECB mode and the given key.
     """
@@ -360,7 +360,7 @@ def magic_text_oracle(instring, key, magic_text, add_rand_chars=True):
     instring = to_prepend + pkcs7_padding(instring, blocksize, padding_amount) + to_append
     instring = bytes(instring)
 
-    return aes_128_in_ecb_mode(instring, key, "encrypt", from_string=True, from_b64=False)
+    return aes_128_in_ecb_mode(instring, key, action, from_string=True, from_b64=False)
 
 def detect_block_size(key):
     for potential_blocksize in range(4, 256):
@@ -386,7 +386,6 @@ def decrypt_magic_text(magic_text, key):
 
     testing = []
 
-# LOL gotta get the whole block wow i lose
     for j in range(256):
         new_input = input_block + bytes([j])
         new_input_result = magic_text_oracle(new_input, key, magic_text, add_rand_chars=False)
@@ -398,3 +397,21 @@ def decrypt_magic_text(magic_text, key):
         result = result + bytes(chr(inputs_dict[byte_short_result]), "utf-8")
 
     return result
+
+def parse_kv(instring):
+    # this is the silliest dictionary comprehension
+    return {i[0]: i[1] for i in [j.split("=") for j in [i for i in instring.split("&")]]}
+
+def profile_for(email):
+    email = email.replace("&", "\&").replace("=", "\=")
+    uid = 10  # being lazy :D;;;
+    role = 'user'
+    return ("email=" + email + "&uid=" + str(uid) + "&role=" + role)
+
+def copypasta_attack():
+    key = random_aes_key()
+    my_plaintext = profile_for("julia@flowerhack.com")
+    my_encrypted_text = magic_text_oracle(bytes(my_plaintext, "utf-8"), key, b'', add_rand_chars=False)
+    my_decrypted_text = magic_text_oracle(my_encrypted_text, key, b'', add_rand_chars=False, action="decrypt")
+
+    # only use user input for profile_for and ciphertexts to make an admin
