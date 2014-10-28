@@ -12,6 +12,9 @@ encode_hex = codecs.getencoder("hex_codec")
 
 # ------------------ Utility Functions ------------------
 
+class PaddingException(Exception):
+    pass
+
 
 def _string_from_file(infile):
     """
@@ -462,3 +465,11 @@ def copypasta_attack():
     my_decrypted_text = magic_text_oracle(my_encrypted_text, key, b'', add_rand_chars=False, action="decrypt")
 
     # only use user input for profile_for and ciphertexts to make an admin
+
+def strip_padding(padded_string):
+    reversed_input = padded_string[::-1]
+    # 01 is valid, 02 02 is valid, 03 03 03 is valid...
+    for i in range(1, len(reversed_input)):
+        if [val for val in reversed_input[0:i]] == [i for num in range(0,i)]:
+            return padded_string[:-i]
+    raise PaddingException

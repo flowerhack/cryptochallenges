@@ -144,5 +144,21 @@ assert equals(
 )
 
 # TODO: Problem 2.7 (15): PKCS#7 padding validation
+assert equals(
+    cryptopals.strip_padding(b'ICE ICE BABY\x04\x04\x04\x04'),
+    b'ICE ICE BABY'
+)
+
+try:
+    cryptopals.strip_padding(b'ICE ICE BABY\x05\x05\x05\x05')
+    assert equals(1,2)
+except cryptopals.PaddingException:
+    pass
+
+try:
+    cryptopals.strip_padding(b'ICE ICE BABY\x01\x02\x03\x04')
+    assert equals(1,2)
+except cryptopals.PaddingException:
+    pass
 
 # TODO: Problem 2.8 (16): CBC bitflipping attacks
