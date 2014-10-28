@@ -299,6 +299,10 @@ def cbc_mode(infile, key, iv, action, from_string=False, from_b64=True):
     else:
         return
 
+def random_length_bytes():
+    """ Generates a random sequence of bytes, with a random length between 1 and 25 """
+    return bytes([randint(0,255) for i in range(0, randint(1,25))])
+
 def random_aes_key():
     """ Generates a random AES key (16 bytes in length) """
     return bytes([randint(0,255) for i in range(0, 16)])
@@ -384,8 +388,7 @@ def decrypt_magic_text(magic_text, key):
     result = b''
     magic_size = len(magic_text)
 
-    testing = []
-
+    # craft the attack dictionary
     for j in range(256):
         new_input = input_block + bytes([j])
         new_input_result = magic_text_oracle(new_input, key, magic_text, add_rand_chars=False)
@@ -397,6 +400,50 @@ def decrypt_magic_text(magic_text, key):
         result = result + bytes(chr(inputs_dict[byte_short_result]), "utf-8")
 
     return result
+
+def fetch(block_size, random_prepend, key):
+    cached_size = None
+    for i in range(0, block_size+1):
+        crafted_input = b'A' * i
+        if not cached_size:
+            cached_size = len(magic_text_oracle(random_prepend + crafted_input, key, b'', add_rand_chars=False))
+        else:
+            temp = len(magic_text_oracle(random_prepend + crafted_input, key, b'', add_rand_chars=False))
+            if (temp > (cached_size + 1)):
+                pad_for_rand = b'A' * (i-1)
+                assert(((len(random_prepend) + (len(pad_for_rand)+1)) % block_size) == 0)
+                return pad_for_rand
+
+def decrypt_magic_text_harder(magic_text, key, random_prepend):
+    magic_text = base64.b64decode(magic_text)
+    block_size = detect_block_size(key)  # is 16, but we compute anyway
+    input_block = craft_input_block(block_size-1)
+    inputs_dict = {}
+    result = b''
+    magic_size = len(magic_text)
+
+    # We need to figure out the size of the random_prepend.  We can probably
+    # do this by figuring out at what point the block size "jumps"...
+    # Suppose block size 8.  3 + 5 --> 8.  4 + 4 --> 8... 8 + 1 --> 16!
+    # So we need to find when block size "jumps" by n-1, where n is block size\
+    pad_for_rand = fetch(block_size, random_prepend, key)
+
+    # Now we know that random_prepend + pad_for_rand gets us a nice block with one free byte at the end.
+    # We can craft an attack dictionary based on this.
+    size_to_slice = len(random_prepend) + len(pad_for_rand) + 1
+    for j in range(256):
+        # new_input is going to be random_prepend + pad_for_rand + a target byte
+        new_input = random_prepend + pad_for_rand + bytes([j])
+        new_input_result = magic_text_oracle(new_input, key, magic_text, add_rand_chars=False)
+        inputs_dict[new_input_result[0:size_to_slice]] = j
+
+    for i in range(magic_size):
+        this_magic = magic_text[i:magic_size]
+        byte_short_result = magic_text_oracle(random_prepend + pad_for_rand, key, this_magic, add_rand_chars=False)[0:size_to_slice]
+        result = result + bytes(chr(inputs_dict[byte_short_result]), "utf-8")
+
+    return result
+
 
 def parse_kv(instring):
     # this is the silliest dictionary comprehension

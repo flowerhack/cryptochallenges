@@ -135,6 +135,13 @@ assert equals(
 cryptopals.copypasta_attack()
 
 # TODO: Problem 2.6 (14): Byte-at-a-time ECB decryption (Harder)
+# Googling ``stimulus'' and ``response'' totally helped here :P
+consistent_key = cryptopals.random_aes_key()
+random_prepend = cryptopals.random_length_bytes()
+assert equals(
+    cryptopals.decrypt_magic_text_harder(solutions.problem_12, consistent_key, random_prepend),
+    solutions.soln_12
+)
 
 # TODO: Problem 2.7 (15): PKCS#7 padding validation
 
