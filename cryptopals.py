@@ -13,6 +13,10 @@ encode_hex = codecs.getencoder("hex_codec")
 # ------------------ Utility Functions ------------------
 
 class PaddingException(Exception):
+    """
+    Thrown when a function expecting a PKCS7-padded string receives a string
+    with invalid padding
+    """
     pass
 
 
@@ -65,14 +69,15 @@ def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)
 
-# ------------------ Main Functions ------------------
 
+# ------------------ Main Functions ------------------
 
 def hex_to_b64(hex_str):
     """ Converts a hex-formatted string into b64 bytes """
     return base64.b64encode(decode_hex(hex_str)[0])
 
 
+# TODO this is only used in one test
 def xor_two_buffers(buffer1, buffer2):
     """ Takes two hex-formatted strings and returns a hex-formatted string """
     return _display_hex(int(buffer1, 16) ^ int(buffer2, 16))
@@ -200,16 +205,16 @@ def decrypt_vigenere(infile):
         sys.stdout.write(chr(ord(byte) ^ ord(next(best_key_cycle))))
 
 
-def aes_128_in_ecb_mode(infile, key, action, from_string=False, from_b64=True):
+# TODO remove the from_b64 flag
+def aes_128_in_ecb_mode(instring, key, action, from_b64=True):
     """
     Allows encrypt or decryption via AES-128 in ECB mode
     If action=="encrypt", this encrypts the contents of infile with key and returns the result.
     If action=="decrypt", this instead returns the *decrypted* contents of infile.
     Else, returns None.
     """
-    cyphertext = infile if from_string else _string_from_file(infile)
+    cyphertext = instring
     cyphertext = cyphertext if not from_b64 else base64.b64decode(cyphertext)
-    key = "YELLOW SUBMARINE"
     if action == "encrypt":
         return AES.new(key).encrypt(cyphertext)
     elif action == "decrypt":
@@ -253,16 +258,17 @@ def pkcs7_padding(utf8_string, target_blocksize, padding_amount=False):
     if not padding_amount:
         padding_amount = target_blocksize - (len(bytetext) % target_blocksize)
     for i in range(0, padding_amount):
-        bytetext.extend(b'\x04')
+        bytetext.extend(bytes([padding_amount]))
     return bytetext
 
 
 # I found the diagram on the CBC wikipedia article very helpful for this!
 # https://en.wikipedia.org/wiki/Block_cipher_mode_of_operation#Cipher-block_chaining_.28CBC.29
 # TODO clean this up wow it's super ugly and I bet we're using it again too
-def cbc_mode(infile, key, iv, action, from_string=False, from_b64=True):
+# start by removing from_b64 flag and make iv optional
+def cbc_mode(instring, key, iv, action, from_b64=True):
     # Read in the string, if it's from a file
-    text = infile if from_string else _string_from_file(infile)
+    text = instring
     # b64decode the string, if it's in b64 format
     text = base64.b64decode(text) if from_b64 else text
     keysize = len(key)
@@ -281,7 +287,7 @@ def cbc_mode(infile, key, iv, action, from_string=False, from_b64=True):
             else:
                 temp_block = xor_two_buffers_mod(prev_block, filtered_group)
             # then encrypt & append to modtext
-            prev_block = aes_128_in_ecb_mode(temp_block, key, "encrypt", from_string=True, from_b64=False)
+            prev_block = aes_128_in_ecb_mode(temp_block, key, "encrypt", from_b64=False)
             modtext = modtext + prev_block
         return modtext
 
@@ -289,7 +295,7 @@ def cbc_mode(infile, key, iv, action, from_string=False, from_b64=True):
         for group in grouper(text, keysize):
             filtered_group = bytes([0 if i is None else i for i in group])
             # Decrypt the current block
-            temp_block = aes_128_in_ecb_mode(filtered_group, key, "decrypt", from_string=True, from_b64=False)
+            temp_block = aes_128_in_ecb_mode(filtered_group, key, "decrypt", from_b64=False)
             # If we're on the first block, XOR against IV; else, XOR against prev_block
             if not prev_block:
                 plain_block = xor_two_buffers_mod(temp_block, iv)
@@ -302,13 +308,16 @@ def cbc_mode(infile, key, iv, action, from_string=False, from_b64=True):
     else:
         return
 
+
 def random_length_bytes():
     """ Generates a random sequence of bytes, with a random length between 1 and 25 """
     return bytes([randint(0,255) for i in range(0, randint(1,25))])
 
+
 def random_aes_key():
     """ Generates a random AES key (16 bytes in length) """
     return bytes([randint(0,255) for i in range(0, 16)])
+
 
 def encryption_oracle(instring):
     """
@@ -330,10 +339,11 @@ def encryption_oracle(instring):
     instring = bytes(instring)
 
     if randint(0, 1) == 0:
-        encrypted = (aes_128_in_ecb_mode(instring, key, "encrypt", from_string=True, from_b64=False), "ECB")
+        encrypted = (aes_128_in_ecb_mode(instring, key, "encrypt", from_b64=False), "ECB")
     else:
-        encrypted = (cbc_mode(instring, key, iv, "encrypt", from_string=True, from_b64=False), "CBC")
+        encrypted = (cbc_mode(instring, key, iv, "encrypt", from_b64=False), "CBC")
     return encrypted
+
 
 def detect_ecb_or_cbc(input):
     """
@@ -345,6 +355,8 @@ def detect_ecb_or_cbc(input):
     else:
         return "CBC"
 
+
+# TODO could probably squash this into something else
 def magic_text_oracle(instring, key, magic_text, add_rand_chars=True, action="encrypt"):
     """
     Encrypts `instring` + `magic_text` using ECB mode and the given key.
@@ -367,9 +379,17 @@ def magic_text_oracle(instring, key, magic_text, add_rand_chars=True, action="en
     instring = to_prepend + pkcs7_padding(instring, blocksize, padding_amount) + to_append
     instring = bytes(instring)
 
-    return aes_128_in_ecb_mode(instring, key, action, from_string=True, from_b64=False)
+    return aes_128_in_ecb_mode(instring, key, action, from_b64=False)
 
+
+# TODO this is done elsewhere, use this function there rather than the dupe
+# also this is wonky can't we just hand it encrypted text?
 def detect_block_size(key):
+    """
+    Detects the blocksize used for encryption.
+    If it cannot be detected, or the blocksize is not between 4 and 256,
+    returns None.
+    """
     for potential_blocksize in range(4, 256):
         test_str = bytes("".join([chr(i) for i in [randint(65,90) for j in range(0, potential_blocksize)]]), "utf-8")
         crypted = magic_text_oracle(test_str*25, key, b'', add_rand_chars=False)
@@ -380,10 +400,15 @@ def detect_block_size(key):
             return potential_blocksize
     return None
 
+
 def craft_input_block(target_size):
+    """ Returns a bytestring of 'AAA...'s, with length target_size """
     return b'A' * target_size
 
+
+# could probably better separate concerns
 def decrypt_magic_text(magic_text, key):
+    """ Decrypts magic_text using byte-at-a-time decryption """
     magic_text = base64.b64decode(magic_text)
     block_size = detect_block_size(key)  # is 16, but we compute anyway
     input_block = craft_input_block(block_size-1)
@@ -418,6 +443,10 @@ def fetch(block_size, random_prepend, key):
                 return pad_for_rand
 
 def decrypt_magic_text_harder(magic_text, key, random_prepend):
+    """
+    Decrypts magic_text using byte_at_a_time decryption, when random_prepend is 
+    being prepended to all calls
+    """
     magic_text = base64.b64decode(magic_text)
     block_size = detect_block_size(key)  # is 16, but we compute anyway
     input_block = craft_input_block(block_size-1)
@@ -467,9 +496,50 @@ def copypasta_attack():
     # only use user input for profile_for and ciphertexts to make an admin
 
 def strip_padding(padded_string):
+    """
+    Strips away the PKCS7 padding from a string and returns it. If padding is
+    invalid, raises a PaddingException
+    """
     reversed_input = padded_string[::-1]
     # 01 is valid, 02 02 is valid, 03 03 03 is valid...
     for i in range(1, len(reversed_input)):
         if [val for val in reversed_input[0:i]] == [i for num in range(0,i)]:
             return padded_string[:-i]
     raise PaddingException
+
+def insert_in_query_and_cbc_encrypt(inbytes, key):
+    """ Inserts user input into the querystring provided in challenge 16 """
+    prepend = b'comment1=cooking%20MCs;userdata='
+    append = b';comment2=%20like%20a%20pound%20of%20bacon'
+    newbytes = (prepend + inbytes.replace(b';', b'\;').replace(b'=', b'\=') + append)
+    paddedbytes = pkcs7_padding(newbytes, 16)
+    crypted = cbc_mode(paddedbytes, key, b'\x00', "encrypt", from_b64=False)
+    return crypted
+
+def find_admin_user_in_cbc_encrypted_text(inbytes, key):
+    """
+    Takes a CBC encrypted byte object and sees if the decrypted result has an
+    admin user
+    """
+    decrypted = cbc_mode(inbytes, key, b'\x00', "decrypt", from_b64=False)
+    if b';admin=true' in decrypted:
+        return True
+    else:
+        return False
+
+def bitfip_attack(inbytes, key):
+    """
+    Very narrowly focused on the attack in challenge 16.
+    Could mod later to make reusable probs
+    """
+    byte_pos_first = None
+    byte_pos_second = None
+    for i in range(0, 256):
+        temp = cbc_mode(inbytes[0:37] + bytes([i]) + inbytes[38:], key, b'\x00', "decrypt", from_b64=False)
+        if b';admin' in temp:
+            byte_pos_first = i
+    for i in range(0, 256):
+        temp = cbc_mode(inbytes[0:43] + bytes([i]) + inbytes[44:], key, b'\x00', "decrypt", from_b64=False)
+        if b'admin=' in temp:
+            byte_pos_second = i
+    return (inbytes[0:37] + bytes([byte_pos_first]) + inbytes[38:43] + bytes([byte_pos_second]) + inbytes[44:])

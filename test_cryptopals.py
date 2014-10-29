@@ -64,13 +64,13 @@ assert equals(
 
 # Problem 1.7: AES in ECB mode
 assert equals(
-    cryptopals.aes_128_in_ecb_mode("testfiles/7.txt", "YELLOW SUBMARINE", "decrypt"),
+    cryptopals.aes_128_in_ecb_mode(cryptopals._string_from_file("testfiles/7.txt"), "YELLOW SUBMARINE", "decrypt"),
     solutions.soln_7
 )
 
-crypted = cryptopals.aes_128_in_ecb_mode(solutions.snake_wounded, "YELLOW SUBMARINE", "encrypt", from_string=True, from_b64=False)
+crypted = cryptopals.aes_128_in_ecb_mode(solutions.snake_wounded, "YELLOW SUBMARINE", "encrypt", from_b64=False)
 assert equals(
-    cryptopals.aes_128_in_ecb_mode(crypted, "YELLOW SUBMARINE", "decrypt", from_string=True, from_b64=False),
+    cryptopals.aes_128_in_ecb_mode(crypted, "YELLOW SUBMARINE", "decrypt", from_b64=False),
     solutions.snake_wounded
 )
 
@@ -93,7 +93,6 @@ cbc_snake = (
         "YELLOW SUBMARINE",
         b'\x00',
         "encrypt",
-        from_string=True,
         from_b64=False
     )
 )
@@ -104,7 +103,6 @@ decoded_cbc_snake = (
         "YELLOW SUBMARINE",
         b'\x00',
         "decrypt",
-        from_string=True,
         from_b64=False
     )
 )
@@ -113,7 +111,7 @@ assert equals(solutions.snake_wounded, decoded_cbc_snake)
 
 assert equals(
     cryptopals.cbc_mode(
-        "testfiles/10.txt", "YELLOW SUBMARINE", b'\x00', "decrypt"
+        cryptopals._string_from_file("testfiles/10.txt"), "YELLOW SUBMARINE", b'\x00', "decrypt"
     ).decode('utf-8'),
     solutions.soln_10
 )
@@ -136,6 +134,7 @@ cryptopals.copypasta_attack()
 
 # TODO: Problem 2.6 (14): Byte-at-a-time ECB decryption (Harder)
 # Googling ``stimulus'' and ``response'' totally helped here :P
+# http://www.blackhat.com/presentations/bh-usa-06/BH-US-06-Eng.pdf
 consistent_key = cryptopals.random_aes_key()
 random_prepend = cryptopals.random_length_bytes()
 assert equals(
@@ -162,3 +161,16 @@ except cryptopals.PaddingException:
     pass
 
 # TODO: Problem 2.8 (16): CBC bitflipping attacks
+key = cryptopals.random_aes_key()
+crypted = cryptopals.insert_in_query_and_cbc_encrypt(b'1234567890123456123450admin0true', key)
+bitflipped = cryptopals.bitfip_attack(crypted, key)
+assert equals(
+    cryptopals.find_admin_user_in_cbc_encrypted_text(bitflipped, key),
+    True
+)
+
+# TODO: Problem 3.1 (17): The CBC padding oracle
+
+# TODO: Problem 3.2 (18): Implement CTR, the stream cipher mode
+
+# TODO: Problem 3.3 (19): Break fixed-nonce CTR mode using substitions
