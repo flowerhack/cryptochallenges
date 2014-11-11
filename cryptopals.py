@@ -559,7 +559,7 @@ def cbc_crypt_random_line(infile, key, from_b64=False):
     random_line = bytes(choice(open(infile).readlines()), "utf-8")
     iv = b'\x00'
     crypted = cbc_mode(pkcs7_padding(random_line, 16), key, iv, "encrypt", from_b64=from_b64)
-    return (crypted, iv)
+    return (crypted, iv, random_line)
 
 def cbc_padding_oracle(cyphertext, key, iv):
     decrypted = cbc_mode(cyphertext, key, iv, "decrypt", from_b64=False)
@@ -573,23 +573,34 @@ def attack_cbc(cyphertext, key, iv, ref):
     #last_cypherblock = cyphertext[-16:]
     #nextlast_cypherblock = cyphertext[-32:-16]
     # ASSUMING KEYSIZE=16 FOR LIKE EVERYTHING i am a terrible hardcoding person sorry
-    plaintext = bytearray(16)
-    last_cypherblock = cyphertext[-16:]
-    nextlast_cypherblock = cyphertext[:-16][-16:]
-    guessed_bytes = bytes(0)
-    expected_byte = 1
-    for position in reversed(range(16)):
-        # We are currently decoding the plaintext that corresponds to last cypherblock.
-        for i in range(0, 256):
-            fake_cyphertext = bytes(position) + bytes([i]) + guessed_bytes + last_cypherblock
-            if cbc_padding_oracle(fake_cyphertext, key, iv):
-                # in this case we think i must be the value of th plaintext at that spot?
-                #import pdb; pdb.set_trace()
-                # that is, p = p'[16] ^ i/c'[16] ^ c[16]
-                plaintext[position] = expected_byte ^ i ^ nextlast_cypherblock[position]
-                expected_byte = expected_byte + 1
-                # we want a new c'[16] such that p'[16] is 2, so
-                #  c'[16] = p'[16] ^ p[16] ^ c[16]
-                #last = bytes([expected_byte ^ plaintext[position] ^ nextlast_cypherblock[position]])
-                guessed_bytes = bytes([expected_byte ^ plaintext[position] ^ nextlast_cypherblock[position]]) + guessed_bytes
-    return plaintext
+    # ASSUMING IV IS 0
+
+    cyphertext = (iv*16) + cyphertext
+    len_cyphertext = len(cyphertext)
+    cur_spot = len_cyphertext
+    final_plaintext = b''
+
+    while (cur_spot-32) >= 0:
+        last_cypherblock = cyphertext[cur_spot-16:cur_spot]
+        nextlast_cypherblock = cyphertext[cur_spot-32:cur_spot-16]
+
+        # initialize stuff for this cycle
+        plaintext = bytearray(16)
+        guessed_bytes = bytes(0)
+        expected_byte = 1
+        for position in reversed(range(16)):
+            # We are currently decoding the plaintext that corresponds to last cypherblock.
+            for i in range(0, 256):
+                fake_cyphertext = bytes(position) + bytes([i]) + guessed_bytes + last_cypherblock
+                if cbc_padding_oracle(fake_cyphertext, key, iv):
+                    # in this case we think i must be the value of th plaintext at that spot?
+                    #import pdb; pdb.set_trace()
+                    # that is, p = p'[16] ^ i/c'[16] ^ c[16]
+                    plaintext[position] = expected_byte ^ i ^ nextlast_cypherblock[position]
+                    expected_byte = expected_byte + 1
+                    guessed_bytes = bytes(0)
+                    for pos_to_guess in range(position, 16):
+                        guessed_bytes = guessed_bytes + bytes([expected_byte ^ plaintext[pos_to_guess] ^ nextlast_cypherblock[pos_to_guess]])
+        final_plaintext = plaintext + final_plaintext
+        cur_spot = cur_spot-16
+    return final_plaintext

@@ -176,13 +176,20 @@ plaintext = b"Hello my friend;Hello my friend"  # len 16+15
 iv = b'\x00'
 plaintext = cryptopals.pkcs7_padding(plaintext, 16)  # todo integrate padding into the cipher itself
 crypted = cryptopals.cbc_mode(plaintext, key, iv, "encrypt", from_b64=False)
-print(cryptopals.attack_cbc(crypted, key, iv, plaintext))
+assert equals(
+    bytearray(b'Hello my friend;Hello my friend\x01'),
+    cryptopals.attack_cbc(crypted, key, iv, plaintext)
+)
 
-#key = cryptopals.random_aes_key()
+key = cryptopals.random_aes_key()
 # todo gonna have to add padding here somewhere...
-#(crypted, iv) = cryptopals.cbc_crypt_random_line("testfiles/17_sources.txt", key)
-#valid_padding = cryptopals.cbc_padding_oracle(crypted, key, iv)
-#cryptopals.attack_cbc(crypted, key, iv, plaintext)
+(crypted, iv, random_line) = cryptopals.cbc_crypt_random_line("testfiles/17_sources.txt", key)
+# TODO add a test for just the oracle function
+# valid_padding = cryptopals.cbc_padding_oracle(crypted, key, iv)
+assert equals(
+    cryptopals.attack_cbc(crypted, key, iv, plaintext),
+    cryptopals.pkcs7_padding(random_line, 16)
+)
 
 # TODO: Problem 3.2 (18): Implement CTR, the stream cipher mode
 
