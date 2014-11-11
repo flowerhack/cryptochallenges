@@ -5,7 +5,7 @@ from collections import defaultdict
 import sys
 from Crypto.Cipher import AES
 import codecs
-from random import randint
+from random import randint, choice
 
 decode_hex = codecs.getdecoder("hex_codec")
 encode_hex = codecs.getencoder("hex_codec")
@@ -247,6 +247,17 @@ def detect_aes_128_in_ecb_mode(infile):
             # Problem hinted at doing 16 bytes at a time, so let's try that
             if detect_ecb(cyphertext):
                 return ("Line " + str(i) + ": " + str(line.strip()))
+
+def strip_padding(padded_string):
+    """
+    Strips away the PKCS7 padding from a string and returns it. If padding is
+    invalid, raises a PaddingException
+    """
+    reversed_input = padded_string[::-1]
+    # 01 is valid, 02 02 is valid, 03 03 03 is valid...
+    for i in range(1, len(reversed_input)):
+        if [val for val in reversed_input[0:i]] == [i for num in range(0,i)]:
+            return padded_string[:-i]
 
 
 def pkcs7_padding(utf8_string, target_blocksize, padding_amount=False):
@@ -543,3 +554,42 @@ def bitfip_attack(inbytes, key):
         if b'admin=' in temp:
             byte_pos_second = i
     return (inbytes[0:37] + bytes([byte_pos_first]) + inbytes[38:43] + bytes([byte_pos_second]) + inbytes[44:])
+
+def cbc_crypt_random_line(infile, key, from_b64=False):
+    random_line = bytes(choice(open(infile).readlines()), "utf-8")
+    iv = b'\x00'
+    crypted = cbc_mode(pkcs7_padding(random_line, 16), key, iv, "encrypt", from_b64=from_b64)
+    return (crypted, iv)
+
+def cbc_padding_oracle(cyphertext, key, iv):
+    decrypted = cbc_mode(cyphertext, key, iv, "decrypt", from_b64=False)
+    try:
+        strip_padding(decrypted)
+        return True
+    except PaddingException:
+        return False
+
+def attack_cbc(cyphertext, key, iv, ref):
+    #last_cypherblock = cyphertext[-16:]
+    #nextlast_cypherblock = cyphertext[-32:-16]
+    # ASSUMING KEYSIZE=16 FOR LIKE EVERYTHING i am a terrible hardcoding person sorry
+    plaintext = bytearray(16)
+    last_cypherblock = cyphertext[-16:]
+    nextlast_cypherblock = cyphertext[:-16][-16:]
+    guessed_bytes = bytes(0)
+    expected_byte = 1
+    for position in reversed(range(16)):
+        # We are currently decoding the plaintext that corresponds to last cypherblock.
+        for i in range(0, 256):
+            fake_cyphertext = bytes(position) + bytes([i]) + guessed_bytes + last_cypherblock
+            if cbc_padding_oracle(fake_cyphertext, key, iv):
+                # in this case we think i must be the value of th plaintext at that spot?
+                #import pdb; pdb.set_trace()
+                # that is, p = p'[16] ^ i/c'[16] ^ c[16]
+                plaintext[position] = expected_byte ^ i ^ nextlast_cypherblock[position]
+                expected_byte = expected_byte + 1
+                # we want a new c'[16] such that p'[16] is 2, so
+                #  c'[16] = p'[16] ^ p[16] ^ c[16]
+                #last = bytes([expected_byte ^ plaintext[position] ^ nextlast_cypherblock[position]])
+                guessed_bytes = bytes([expected_byte ^ plaintext[position] ^ nextlast_cypherblock[position]]) + guessed_bytes
+    return plaintext

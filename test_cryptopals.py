@@ -161,6 +161,7 @@ except cryptopals.PaddingException:
     pass
 
 # TODO: Problem 2.8 (16): CBC bitflipping attacks
+# this was helpful: http://resources.infosecinstitute.com/cbc-byte-flipping-attack-101-approach/
 key = cryptopals.random_aes_key()
 crypted = cryptopals.insert_in_query_and_cbc_encrypt(b'1234567890123456123450admin0true', key)
 bitflipped = cryptopals.bitfip_attack(crypted, key)
@@ -170,6 +171,18 @@ assert equals(
 )
 
 # TODO: Problem 3.1 (17): The CBC padding oracle
+key = cryptopals.random_aes_key()
+plaintext = b"Hello my friend;Hello my friend"  # len 16+15
+iv = b'\x00'
+plaintext = cryptopals.pkcs7_padding(plaintext, 16)  # todo integrate padding into the cipher itself
+crypted = cryptopals.cbc_mode(plaintext, key, iv, "encrypt", from_b64=False)
+print(cryptopals.attack_cbc(crypted, key, iv, plaintext))
+
+#key = cryptopals.random_aes_key()
+# todo gonna have to add padding here somewhere...
+#(crypted, iv) = cryptopals.cbc_crypt_random_line("testfiles/17_sources.txt", key)
+#valid_padding = cryptopals.cbc_padding_oracle(crypted, key, iv)
+#cryptopals.attack_cbc(crypted, key, iv, plaintext)
 
 # TODO: Problem 3.2 (18): Implement CTR, the stream cipher mode
 
