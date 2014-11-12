@@ -192,5 +192,13 @@ assert equals(
 )
 
 # TODO: Problem 3.2 (18): Implement CTR, the stream cipher mode
+assert equals(
+    cryptopals.ctr_stream(
+        b"L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==",
+        b"YELLOW SUBMARINE",
+        0
+    ),
+    b"Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby "
+)
 
 # TODO: Problem 3.3 (19): Break fixed-nonce CTR mode using substitions

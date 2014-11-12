@@ -4,6 +4,8 @@ from itertools import cycle, zip_longest
 from collections import defaultdict
 import sys
 from Crypto.Cipher import AES
+from Crypto.Util import Counter
+import struct
 import codecs
 from random import randint, choice
 
@@ -604,3 +606,14 @@ def attack_cbc(cyphertext, key, iv, ref):
         final_plaintext = plaintext + final_plaintext
         cur_spot = cur_spot-16
     return final_plaintext
+
+# key = 'YELLOW SUBMARINE'
+# nonce = 0
+# format = 64 bit unsigned little endian nonce, 
+#          64 bit little endian block count (byte count / 16)
+# nonce + counter: ENCRYPT WITH KEY, then XOR with plaintext
+def ctr_stream(text, key, nonce):
+    packnonce = struct.pack('<Q', nonce)
+    ctr = Counter.new(64, prefix=packnonce, initial_value=nonce, little_endian=True)
+    cipher = AES.new(key, AES.MODE_CTR, counter=ctr)
+    return cipher.encrypt(base64.b64decode(text))
